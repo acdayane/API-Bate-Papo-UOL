@@ -13,6 +13,12 @@ const nameSchema = joi.object({
   name: joi.string().required().min(2).max(30)
 });
 
+const messageSchema = joi.object({
+  to: joi.string().required(),
+  text: joi.string().required(),
+  type: joi.string().required() //('message' || 'private_message')
+});
+
 let time = new Date();
 let currentTime = time.getHours() + ':' + time.getMinutes() + ':' + time.getSeconds();
 let lastStatus = Date.now();
@@ -31,16 +37,16 @@ let collectionParticipants = db.collection('participants');
 let collectionMessages = db.collection('messages');
 
 app.post('/participants', async (req, res) => {
-  const {name} = req.body;
+  const { name } = req.body;
 
-  const validation = nameSchema.validate({name}, {abortEarly: false});
-  
+  const validation = nameSchema.validate({ name }, { abortEarly: false });
+
   if (validation.error) {
-    const errors = validation.error.details.map((d) => d.message);
-    res.send(errors);
+    const err = validation.error.details.map((d) => d.message);
+    res.status(422).send(err);
     return;
   }
-  
+
   try {
     const responseParticipant = await collectionParticipants.insertOne({ name, lastStatus: lastStatus });
     res.sendStatus(201);
@@ -62,14 +68,45 @@ app.get('/participants', async (req, res) => {
   try {
     const participants = await collectionParticipants.find().toArray();
     console.log(participants);
-    res.sendStatus(200);   
+    res.sendStatus(200);
   } catch (err) {
     res.status(500).send(err);
   }
-  
 });
 
+app.post('/messages', async (req, res) => {
+  const { to, text, type } = req.body;
 
+  const validation = messageSchema.validate({ to, text, type }, { abortEarly: false });
+
+  if (validation.error) {
+    const err = validation.error.details.map((d) => d.message);
+    res.status(422).send(err);
+    return;
+  }
+
+  try {
+    const responseMessage = await collectionMessages.insertOne({ from: "day", to, text, type, time: currentTime });
+    res.sendStatus(201);
+    console.log(responseMessage)
+  } catch (err) {
+    res.status(500).send(err);
+  }
+});
+
+app.get('/messages', async (req, res) => {
+  try {
+    const messages = await collectionMessages.find().toArray();
+    console.log(messages);
+    res.sendStatus(200);
+  } catch (err) {
+    res.status(500).send(err);
+  }
+});
+
+app.post('/status', async (req, res) => {
+
+});
 
 
 app.listen(process.env.PORT, () => console.log(`App is running on port ${process.env.PORT}`));

@@ -32,6 +32,7 @@ let db = mongoClient.db('API-UOL');
 let collectionParticipants = db.collection('participants');
 let collectionMessages = db.collection('messages');
 let time = new Date();
+let participants = '';
 
 app.post('/participants', async (req, res) => {
   const { name } = req.body;
@@ -69,7 +70,7 @@ app.post('/participants', async (req, res) => {
 
 app.get('/participants', async (req, res) => {
   try {
-    const participants = await collectionParticipants.find().toArray();
+    participants = await collectionParticipants.find().toArray();
     res.status(200).send(participants);
   } catch (err) {
     res.status(500).send(err);
@@ -87,7 +88,7 @@ app.post('/messages', async (req, res) => {
     res.status(422).send(err);
     return;
   }
-
+  console.log(user)
   if (!user) {
     res.sendStatus(401);
     return
@@ -99,7 +100,8 @@ app.post('/messages', async (req, res) => {
       to,
       text,
       type,
-      time: currentTime });
+      time: time.getHours() + ':' + time.getMinutes() + ':' + time.getSeconds()
+    });
     res.sendStatus(201);
   } catch (err) {
     res.status(500).send(err);
@@ -107,6 +109,7 @@ app.post('/messages', async (req, res) => {
 });
 
 app.get('/messages', async (req, res) => {
+
   try {
     const messages = await collectionMessages.find().toArray();
     res.status(200).send(messages);
@@ -116,8 +119,49 @@ app.get('/messages', async (req, res) => {
 });
 
 app.post('/status', async (req, res) => {
+  const { user } = req.headers;
+  const currentTime = Date.now();
 
+  try {
+    const participants = await collectionParticipants.find().toArray();
+    const keepOnline = participants.filter((p) => {
+      return currentTime - 10000 <= p.lastStatus
+    });
+
+    if (participants.length !== keepOnline.length) {
+      const offline = participants.filter((p) => {
+        return currentTime - 10000 > p.lastStatus
+      });
+      for (let i = 0; i < offline.length; i++) {
+        await collectionMessages.insertOne({
+          from: offline[i].name,
+          to: 'Todos',
+          text: 'sai da sala...',
+          type: 'status',
+          time: time.getHours() + ':' + time.getMinutes() + ':' + time.getSeconds()
+        });
+      }
+    }
+
+    await collectionParticipants.deleteMany({});
+
+    for (let i = 0; i < keepOnline.length; i++) {
+      await collectionParticipants.insertOne({
+        name: keepOnline[i].name,
+        lastStatus: keepOnline[i].lastStatus
+      });
+    }
+
+    const userDB = await collectionParticipants.findOne({ name: user })
+
+    if (!userDB) {
+      res.sendStatus(404);
+      return
+    }
+    res.sendStatus(200)
+  } catch (err) {
+    res.status(500).send(err)
+  }
 });
-
 
 app.listen(process.env.PORT, () => console.log(`App is running on port ${process.env.PORT}`));

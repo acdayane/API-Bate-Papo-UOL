@@ -19,10 +19,6 @@ const messageSchema = joi.object({
   type: joi.string().required().valid('message', 'private_message')
 });
 
-let time = new Date();
-let currentTime = time.getHours() + ':' + time.getMinutes() + ':' + time.getSeconds();
-let lastStatus = Date.now();
-
 const mongoClient = new MongoClient(process.env.MONGO_URI);
 
 try {
@@ -32,9 +28,10 @@ try {
   console.log(err);
 }
 
-let db = mongoClient.db('UOL');
+let db = mongoClient.db('API-UOL');
 let collectionParticipants = db.collection('participants');
 let collectionMessages = db.collection('messages');
+let time = new Date();
 
 app.post('/participants', async (req, res) => {
   const { name } = req.body;
@@ -49,15 +46,22 @@ app.post('/participants', async (req, res) => {
 
   try {
     const compareName = await collectionParticipants.findOne({ name });
-        if (compareName) {
-            return res.status(409).send(`${name} já está na sala. Escolha outro nome.`);
-        }
+    if (compareName) {
+      return res.status(409).send(`${name} já está na sala. Escolha outro nome.`);
+    }
 
-    const responseParticipant = await collectionParticipants.insertOne({ name, lastStatus: lastStatus });
-    const responseMessage = await collectionMessages.insertOne({from: name, to: 'Todos', text: 'entra na sala...', type: 'status', time: currentTime});
+    await collectionParticipants.insertOne({
+      name,
+      lastStatus: Date.now()
+    });
+    await collectionMessages.insertOne({
+      from: name,
+      to: 'Todos',
+      text: 'entra na sala...',
+      type: 'status',
+      time: time.getHours() + ':' + time.getMinutes() + ':' + time.getSeconds()
+    });
     res.sendStatus(201);
-    console.log(responseParticipant)
-    console.log(responseMessage)
   } catch (err) {
     res.status(500).send(err);
   }
@@ -66,8 +70,7 @@ app.post('/participants', async (req, res) => {
 app.get('/participants', async (req, res) => {
   try {
     const participants = await collectionParticipants.find().toArray();
-    console.log(participants);
-    res.sendStatus(200);
+    res.status(200).send(participants);
   } catch (err) {
     res.status(500).send(err);
   }
@@ -75,6 +78,7 @@ app.get('/participants', async (req, res) => {
 
 app.post('/messages', async (req, res) => {
   const { to, text, type } = req.body;
+  const { user } = req.headers;
 
   const validation = messageSchema.validate({ to, text, type }, { abortEarly: false });
 
@@ -84,10 +88,19 @@ app.post('/messages', async (req, res) => {
     return;
   }
 
+  if (!user) {
+    res.sendStatus(401);
+    return
+  }
+
   try {
-    const responseMessage = await collectionMessages.insertOne({ from: "day", to, text, type, time: currentTime });
+    await collectionMessages.insertOne({
+      from: user,
+      to,
+      text,
+      type,
+      time: currentTime });
     res.sendStatus(201);
-    console.log(responseMessage)
   } catch (err) {
     res.status(500).send(err);
   }
@@ -96,8 +109,7 @@ app.post('/messages', async (req, res) => {
 app.get('/messages', async (req, res) => {
   try {
     const messages = await collectionMessages.find().toArray();
-    console.log(messages);
-    res.sendStatus(200);
+    res.status(200).send(messages);
   } catch (err) {
     res.status(500).send(err);
   }

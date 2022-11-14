@@ -16,7 +16,7 @@ const nameSchema = joi.object({
 const messageSchema = joi.object({
   to: joi.string().required(),
   text: joi.string().required(),
-  type: joi.string().required() //('message' || 'private_message')
+  type: joi.string().required().valid('message', 'private_message')
 });
 
 let time = new Date();
@@ -48,20 +48,19 @@ app.post('/participants', async (req, res) => {
   }
 
   try {
+    const compareName = await collectionParticipants.findOne({ name });
+        if (compareName) {
+            return res.status(409).send(`${name} já está na sala. Escolha outro nome.`);
+        }
+
     const responseParticipant = await collectionParticipants.insertOne({ name, lastStatus: lastStatus });
+    const responseMessage = await collectionMessages.insertOne({from: name, to: 'Todos', text: 'entra na sala...', type: 'status', time: currentTime});
     res.sendStatus(201);
     console.log(responseParticipant)
+    console.log(responseMessage)
   } catch (err) {
     res.status(500).send(err);
   }
-
-  // try {
-  //   const responseMessage = await collectionMessages.insertOne({from: name, to: 'Todos', text: 'entra na sala...', type: 'status', time: currentTime});
-  //   res.sendStatus(201);
-  //   console.log(responseMessage)
-  // } catch (err) {
-  //   console.log(err);
-  // }
 })
 
 app.get('/participants', async (req, res) => {

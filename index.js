@@ -31,10 +31,10 @@ try {
 let db = mongoClient.db('API-UOL');
 let collectionParticipants = db.collection('participants');
 let collectionMessages = db.collection('messages');
-let time = new Date();
 let participants = '';
 
 app.post('/participants', async (req, res) => {
+  let time = new Date();
   const { name } = req.body;
 
   const validation = nameSchema.validate({ name }, { abortEarly: false });
@@ -78,6 +78,7 @@ app.get('/participants', async (req, res) => {
 });
 
 app.post('/messages', async (req, res) => {
+  let time = new Date();
   const { to, text, type } = req.body;
   const { user } = req.headers;
 
@@ -119,6 +120,7 @@ app.get('/messages', async (req, res) => {
 });
 
 app.post('/status', async (req, res) => {
+  let time = new Date();
   const { user } = req.headers;
   const currentTime = Date.now();
 
